@@ -77,18 +77,19 @@ int64_t Derived1::getSumLen(size_t offset, size_t len) const {
 // CHECK: ret i64
 
 // CHECK-LABEL: i64 @_ZNK8Derived17getSum9Em
-// CHECK-NOT: tail call noundef i64
+// CHECK: %[[VCALL_SLOT1:.*]] = load ptr, ptr %vtable
+// CHECK: tail call noundef i64 %[[VCALL_SLOT1]](
 // CHECK: ret i64
 
 // CHECK-LABEL: i64 @_ZNK8Derived18getSum10Em
-// CHECK: tail call noundef i64 @_ZNK8Derived13getEm(
+// CHECK: %[[VCALL_SLOT1:.*]] = load ptr, ptr %vtable
+// CHECK: tail call noundef i64 %[[VCALL_SLOT1]](
 // CHECK: ret i64
 
 // CHECK-LABEL: i64 @_ZNK8Derived19getSumLenEmm
 // CHECK: %[[VCALL_SLOT1:.*]] = load ptr, ptr %vtable
 // CHECK: tail call noundef i64 %[[VCALL_SLOT1]](
 // CHECK: ret i64
-
 
 // STRICT-LABEL: i64 @_ZNK8Derived18getBatchEmmPl
 // STRICT-NOT: tail call

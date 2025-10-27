@@ -1316,11 +1316,13 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
       // fast register allocator would be happier...
       CXXThisValue = CXXABIThisValue;
     }
-    const CXXRecordDecl *ThisRecordDecl = MD->getParent();
-    bool IsStructor = isa<CXXDestructorDecl, CXXConstructorDecl>(MD);
-    if (MD->isVirtual() && !IsStructor && ThisRecordDecl->isEffectivelyFinal())
-      EmitVTableAssumptionLoads(ThisRecordDecl, LoadCXXThisAddress());
-
+    if (CGM.getCodeGenOpts().StrictVTablePointers) {
+      const CXXRecordDecl *ThisRecordDecl = MD->getParent();
+      bool IsStructor = isa<CXXDestructorDecl, CXXConstructorDecl>(MD);
+      bool IsFinal = ThisRecordDecl->isEffectivelyFinal();
+      if (MD->isVirtual() && !IsStructor && IsFinal)
+        EmitVTableAssumptionLoads(ThisRecordDecl, LoadCXXThisAddress());
+    }
     // Check the 'this' pointer once per function, if it's available.
     if (CXXABIThisValue) {
       SanitizerSet SkippedChecks;
