@@ -45,18 +45,21 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
     if (!callOp)
       continue;
 
-    // Skip if the result is not 8-bit wide (this implies that the operands are
-    // also 8-bit wide)
-    if (!callOp->getType()->isIntegerTy() || callOp->getCalledFunction()->getName().str() != "ex")
+    if (!callOp->getType()->isIntegerTy() || callOp->getCalledFunction()->getName().str().rfind("xivccf", 0) == 0)
       continue;
-
-    // A uniform API for creating instructions and inserting
-    // them into basic blocks
+    bool canTry = false;
+    for (unsigned int i = 0; i < callOp->getCalledFunction()->arg_size(); ++i) {
+      if (callOp->getArgOperand(i)->getType()->isIntegerTy()) canTry = true;
+    }
+    if (!canTry) continue;
+    Changed = true;
     
     auto func = callOp->getCalledFunction();
     llvm::ValueToValueMapTy Vmap{};
+    
     auto clone = llvm::CloneFunction(func, Vmap);
-    std::cout << "NAME OF FUNCTION IS " << clone->getName().str() << std::endl;
+    clone->setName("xivccf." + callOp->getCalledFunction()->getName().str() + ".xivccf." + clone->getName());
+    // std::cout << "NAME OF FUNCTION IS " << clone->getName().str() << std::endl;
     // now insert any known values into this !!
     // actually first, lets just check that this cloning works period
     
@@ -70,17 +73,8 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
     auto testblock = llvm::BasicBlock::Create(clone->getContext(), "testBlock", clone, 0);
     Builder.SetInsertPoint(testblock);
     AssumptionCache ac = AssumptionCache(*BB.getParent());
-    // F.getParent()
     LazyValueInfo lz{&ac, &BB.getParent()->getParent()->getDataLayout()};
-    // llvm::raw_os_ostream llvm_out(std::cout);
-    // lz.printLVI(*BB.getParent(), fam.getResult<DominatorTreeAnalysis>(*BB.getParent()), llvm_out);
-    // llvm_out.write("\n that was the analysis?\n", 26);
-    // llvm_out.flush();
-    // llvm::ConstantRange range = lz.getConstantRange(callOp->getArgOperand(0), &*Inst, false);
-    
-    // std::cout << (nullptr == lz.getConstant(callOp->getArgOperand(0), &*Inst)) << std::endl;
-    // std::cout << (int) range.getLower().getLimitedValue() << std::endl;
-    // std::cout << std::endl;
+
     std::vector<Value*> toAnd;
     for (unsigned int i = 0; i < clone->arg_size(); ++i) {
         // get the i-th argument
@@ -89,8 +83,8 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
         llvm::ConstantRange range = lz.getConstantRange(callOp->getArgOperand(i), &*Inst, false);
         // llvm::ConstantRange range = lz
 
-        std::cout << (int) range.getLower().getLimitedValue() << std::endl;
-        std::cout << (int) range.getUpper().getLimitedValue() << std::endl;
+        // std::cout << (int) range.getLower().getLimitedValue() << std::endl;
+        // std::cout << (int) range.getUpper().getLimitedValue() << std::endl;
         auto low = Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, clone->getArg(i), llvm::ConstantInt::get(Builder.getInt32Ty(), range.getLower()));
         // Builder.CreateAssumption(low);
         auto high = Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, clone->getArg(i), llvm::ConstantInt::get(Builder.getInt32Ty(), range.getUpper()));
@@ -110,7 +104,6 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
   return Changed;
 }
 bool runOnFunction(llvm::Function &F, llvm::LazyValueAnalysis::Result &lz, FunctionAnalysisManager &fam) {
-  std::cout << "RUNNING ON FUNCTION " << F.getName().str() << std::endl; 
   bool ret = false;
   for (auto &BB : F) ret |= runOnBasicBlock(BB, lz, fam);
   return ret;
