@@ -45,6 +45,19 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
     if (!callOp)
       continue;
 
+    auto *CB = dyn_cast<CallBase>(Inst);
+
+    for (auto &arg : CB->args()) {
+      if (arg->getType()->isIntegerTy()) {
+        AssumptionCache ac = AssumptionCache(*BB.getParent());
+        LazyValueInfo lz{&ac, &BB.getParent()->getParent()->getDataLayout()};
+        auto assumptions = ac.assumptionsFor(arg);
+        for (auto pred : assumptions) {
+          std::cout << pred.Assume << std::endl;
+        }
+      }
+    }
+
     // Skip if the result is not 8-bit wide (this implies that the operands are
     // also 8-bit wide)
     if (!callOp->getType()->isIntegerTy() || callOp->getCalledFunction()->getName().str() != "ex")

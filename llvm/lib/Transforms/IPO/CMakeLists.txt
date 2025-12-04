@@ -25,6 +25,7 @@ add_llvm_component_library(LLVMipo
   HotColdSplitting.cpp
   IPO.cpp
   IROutliner.cpp
+  IPVRP.cpp
   InferFunctionAttrs.cpp
   Inliner.cpp
   Internalize.cpp

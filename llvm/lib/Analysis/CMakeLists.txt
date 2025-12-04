@@ -76,6 +76,7 @@ add_llvm_component_library(LLVMAnalysis
   EphemeralValuesCache.cpp
   FloatingPointPredicateUtils.cpp
   FunctionPropertiesAnalysis.cpp
+  FunctionRetSummaryInfo.cpp
   GlobalsModRef.cpp
   GuardUtils.cpp
   HashRecognize.cpp
