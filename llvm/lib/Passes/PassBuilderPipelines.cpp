@@ -138,6 +138,7 @@
 #include "llvm/Transforms/Utils/InjectTLIMappings.h"
 #include "llvm/Transforms/Utils/LibCallsShrinkWrap.h"
 #include "llvm/Transforms/Utils/LVIExt.h"
+#include "llvm/Transforms/Utils/LVIExtCleanup.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Utils/MoveAutoInit.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
@@ -1279,6 +1280,15 @@ PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
   else
     MPM.addPass(buildInlinerPipeline(Level, Phase));
 
+  MPM.addPass(LVIExt());
+
+    if (EnableModuleInliner)
+    MPM.addPass(buildModuleInlinerPipeline(Level, Phase));
+  else
+    MPM.addPass(buildInlinerPipeline(Level, Phase));
+
+  MPM.addPass(LVIExtCleanup());
+
   // Remove any dead arguments exposed by cleanups, constant folding globals,
   // and argument promotion.
   MPM.addPass(DeadArgumentEliminationPass());
@@ -1656,9 +1666,11 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
   // Add the core simplification pipeline.
   MPM.addPass(buildModuleSimplificationPipeline(Level, Phase));
 
-  MPM.addPass(LVIExt());
+  // MPM.addPass(LVIExt());
 
-  MPM.addPass(buildModuleSimplificationPipeline(Level, Phase));
+  // MPM.addPass(buildModuleSimplificationPipeline(Level, Phase));
+
+  // MPM.addPass(LVIExtCleanup());
 
   // Now add the optimization pipeline.
   MPM.addPass(buildModuleOptimizationPipeline(Level, Phase));
