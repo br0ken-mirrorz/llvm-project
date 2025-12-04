@@ -22,7 +22,7 @@ void FunctionRetSummary::buildSummary(Function* F, FunctionAnalysisManager& FAM)
         auto Inst = BB->getTerminator(); 
         if (ReturnInst *Ret = dyn_cast<ReturnInst>(Inst)) {
             Value *v = Ret->getReturnValue();
-            current->subtreeRange = LVI->getConstantRangeAtUse(v); // not sure if this should be at use or not          
+            current->subtreeRange = LVI->getConstantRangeAtUse(v, true); // not sure if this should be at use or not          
         } else if (BranchInst *Branch = dyn_cast<BranchInst>(Inst)) {
             if (!Branch->isConditional()) self(self,Branch->getSuccessor(0), current);
 
