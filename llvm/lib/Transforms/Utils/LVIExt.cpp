@@ -39,6 +39,8 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
   
   // Loop over all instructions in the block. Replacing instructions requires
   // iterators, hence a for-range loop wouldn't be suitable
+  AssumptionCache ac = AssumptionCache(*BB.getParent());
+  LazyValueInfo lz{&ac, &BB.getParent()->getParent()->getDataLayout()};
   for (auto Inst = BB.begin(), IE = BB.end(); Inst != IE; ++Inst) {
     // Skip non-binary (e.g. unary or compare) instructions
     auto *callOp = dyn_cast<CallInst>(Inst);
@@ -49,7 +51,9 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
       continue;
     bool canTry = false;
     for (unsigned int i = 0; i < callOp->getCalledFunction()->arg_size(); ++i) {
-      if (callOp->getArgOperand(i)->getType()->isIntegerTy()) canTry = true;
+      if (callOp->getArgOperand(i)->getType()->isIntegerTy()
+    && lz.getConstantRange(callOp->getArgOperand(i), &*Inst, false).getLower().getLimitedValue() != 
+      lz.getConstantRange(callOp->getArgOperand(i), &*Inst, false).getUpper().getLimitedValue()) canTry = true;
     }
     if (!canTry) continue;
     Changed = true;
@@ -72,8 +76,7 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
     Builder.CreateUnreachable();
     auto testblock = llvm::BasicBlock::Create(clone->getContext(), "testBlock", clone, 0);
     Builder.SetInsertPoint(testblock);
-    AssumptionCache ac = AssumptionCache(*BB.getParent());
-    LazyValueInfo lz{&ac, &BB.getParent()->getParent()->getDataLayout()};
+    
 
     std::vector<Value*> toAnd;
     for (unsigned int i = 0; i < clone->arg_size(); ++i) {
@@ -81,16 +84,22 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
         if (!callOp->getArgOperand(i)->getType()->isIntegerTy()) continue;
         // LazyValueInfo &lz <LazyValueInfo>();
         llvm::ConstantRange range = lz.getConstantRange(callOp->getArgOperand(i), &*Inst, false);
+        
         // llvm::ConstantRange range = lz
 
         // std::cout << (int) range.getLower().getLimitedValue() << std::endl;
         // std::cout << (int) range.getUpper().getLimitedValue() << std::endl;
         auto low = Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, clone->getArg(i), llvm::ConstantInt::get(Builder.getInt32Ty(), range.getLower()));
         // Builder.CreateAssumption(low);
-        auto high = Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, clone->getArg(i), llvm::ConstantInt::get(Builder.getInt32Ty(), range.getUpper()));
+        auto high = Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, clone->getArg(i), llvm::ConstantInt::get(Builder.getInt32Ty(), range.getUpper()));
         // Builder.CreateAssumption(high);
-        auto andins = Builder.CreateAnd(low, high);
-        toAnd.push_back(andins);
+        if (range.getLower().getLimitedValue() < range.getUpper().getLimitedValue()) {
+          auto andins = Builder.CreateAnd(low, high);
+          toAnd.push_back(andins);
+        } else {
+          auto orins = Builder.CreateOr(low, high);
+          toAnd.push_back(orins);
+        }
     }
     while (toAnd.size() > 1) {
         toAnd[0] = Builder.CreateAnd(toAnd[0], toAnd.back());
