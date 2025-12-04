@@ -59,6 +59,7 @@ add_llvm_component_library(LLVMTransformUtils
   LowerSwitch.cpp
   LowerVectorIntrinsics.cpp
   LVIExt.cpp
+  LVIExtCleanup.cpp
   MatrixUtils.cpp
   MemoryOpRemark.cpp
   MemoryTaggingSupport.cpp
