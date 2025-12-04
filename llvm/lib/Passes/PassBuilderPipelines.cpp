@@ -137,6 +137,7 @@
 #include "llvm/Transforms/Utils/ExtraPassManager.h"
 #include "llvm/Transforms/Utils/InjectTLIMappings.h"
 #include "llvm/Transforms/Utils/LibCallsShrinkWrap.h"
+#include "llvm/Transforms/Utils/LVIExt.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Utils/MoveAutoInit.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
@@ -1653,6 +1654,10 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
   invokePipelineStartEPCallbacks(MPM, Level);
 
   // Add the core simplification pipeline.
+  MPM.addPass(buildModuleSimplificationPipeline(Level, Phase));
+
+  MPM.addPass(LVIExt());
+
   MPM.addPass(buildModuleSimplificationPipeline(Level, Phase));
 
   // Now add the optimization pipeline.
