@@ -42,7 +42,7 @@ bool runOnBasicBlock(llvm::Module &M, BasicBlock &BB, FunctionAnalysisManager &f
     auto *callOp = dyn_cast<CallInst>(Inst);
     if (!callOp)
       continue;
-
+    if (callOp->getCalledFunction() == nullptr) continue;
     if (callOp->getCalledFunction()->getName().str().rfind("xivccf.", 0) == 0) {
         callOp->setCalledFunction(M.getOrInsertFunction(
             callOp->getCalledFunction()->getName().str().substr(7, callOp->getCalledFunction()->getName().str().rfind(".xivccf") - 7), callOp->getCalledFunction()->getFunctionType()));

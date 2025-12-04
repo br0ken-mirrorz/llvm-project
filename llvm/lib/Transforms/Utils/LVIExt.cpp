@@ -46,14 +46,18 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
     auto *callOp = dyn_cast<CallInst>(Inst);
     if (!callOp)
       continue;
-
+    if (callOp->getCalledFunction() == nullptr) continue;
     if (!callOp->getType()->isIntegerTy() || callOp->getCalledFunction()->getName().str().rfind("xivccf", 0) == 0)
       continue;
     bool canTry = false;
     for (unsigned int i = 0; i < callOp->getCalledFunction()->arg_size(); ++i) {
-      if (callOp->getArgOperand(i)->getType()->isIntegerTy()
-    && lz.getConstantRange(callOp->getArgOperand(i), &*Inst, false).getLower().getLimitedValue() != 
-      lz.getConstantRange(callOp->getArgOperand(i), &*Inst, false).getUpper().getLimitedValue()) canTry = true;
+      if (callOp->getArgOperand(i)->getType()->isIntegerTy()) {
+        llvm::ConstantRange range = lz.getConstantRange(callOp->getArgOperand(i), &*Inst, true);
+        if(!range.isFullSet()) canTry = true;
+      } else {
+        canTry = false;
+        break;
+      }
     }
     if (!canTry) continue;
     Changed = true;
@@ -62,7 +66,7 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
     llvm::ValueToValueMapTy Vmap{};
     
     auto clone = llvm::CloneFunction(func, Vmap);
-    clone->setName("xivccf." + callOp->getCalledFunction()->getName().str() + ".xivccf." + clone->getName());
+    clone->setName("xivccf." + callOp->getCalledFunction()->getName().str() + ".xivccf." + clone->getName().str());
     // std::cout << "NAME OF FUNCTION IS " << clone->getName().str() << std::endl;
     // now insert any known values into this !!
     // actually first, lets just check that this cloning works period
@@ -83,15 +87,17 @@ bool runOnBasicBlock(BasicBlock &BB, llvm::LazyValueAnalysis::Result &, Function
         // get the i-th argument
         if (!callOp->getArgOperand(i)->getType()->isIntegerTy()) continue;
         // LazyValueInfo &lz <LazyValueInfo>();
-        llvm::ConstantRange range = lz.getConstantRange(callOp->getArgOperand(i), &*Inst, false);
-        
+        llvm::ConstantRange range = lz.getConstantRange(callOp->getArgOperand(i), &*Inst, true);
+        if (range.isFullSet()) continue;
         // llvm::ConstantRange range = lz
 
         // std::cout << (int) range.getLower().getLimitedValue() << std::endl;
         // std::cout << (int) range.getUpper().getLimitedValue() << std::endl;
-        auto low = Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, clone->getArg(i), llvm::ConstantInt::get(Builder.getInt32Ty(), range.getLower()));
+        auto numBits = range.getBitWidth();
+        auto type = Builder.getIntNTy(numBits);
+        auto low = Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, clone->getArg(i), llvm::ConstantInt::get(type, range.getLower()));
         // Builder.CreateAssumption(low);
-        auto high = Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, clone->getArg(i), llvm::ConstantInt::get(Builder.getInt32Ty(), range.getUpper()));
+        auto high = Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, clone->getArg(i), llvm::ConstantInt::get(type, range.getUpper()));
         // Builder.CreateAssumption(high);
         if (range.getLower().getLimitedValue() < range.getUpper().getLimitedValue()) {
           auto andins = Builder.CreateAnd(low, high);
@@ -124,6 +130,7 @@ bool LVIExt::runOnModule(Module &M, llvm::ModuleAnalysisManager &mam) {
 
   std::vector<llvm::Function*> funcs{};
   for (auto &F : M) {
+    if (F.isIntrinsic()) continue;
     funcs.push_back(&F);
   }
   
